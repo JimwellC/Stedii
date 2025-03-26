@@ -6,15 +6,15 @@ import 'package:audioplayers/audioplayers.dart';
 class TimerScreen extends StatefulWidget {
   final List<String> tasks;
   final String? selectedTask;
-  const TimerScreen({Key? key, required this.tasks, this.selectedTask}) : super(key: key);
+  const TimerScreen({super.key, required this.tasks, this.selectedTask});
 
   @override
   TimerScreenState createState() => TimerScreenState();
 }
 
 class TimerScreenState extends State<TimerScreen> {
-  int _seconds = 1500;
-  final int _breakDuration = 300;
+  int _seconds = 1;
+  final int _breakDuration = 1;
   bool _isRunning = false;
   bool _isBreak = false;
   Timer? _timer;
@@ -33,7 +33,7 @@ class TimerScreenState extends State<TimerScreen> {
     _musicPlayer.setReleaseMode(ReleaseMode.loop);
     _musicPlayer.setVolume(_isMuted ? 0.0 : 1.0);
   }
-  
+
   void _toggleMute() {
     setState(() {
       _isMuted = !_isMuted;
@@ -45,7 +45,8 @@ class TimerScreenState extends State<TimerScreen> {
   Future<void> _loadTasks() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _selectedTask = widget.selectedTask ?? prefs.getString('last_selected_task');
+      _selectedTask =
+          widget.selectedTask ?? prefs.getString('last_selected_task');
     });
   }
 
@@ -53,7 +54,7 @@ class TimerScreenState extends State<TimerScreen> {
     if (!_isMuted) {
       await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
     }
-  } 
+  }
 
   Future<void> _saveSelectedTask(String task) async {
     final prefs = await SharedPreferences.getInstance();
@@ -77,7 +78,7 @@ class TimerScreenState extends State<TimerScreen> {
         } else {
           _timer!.cancel();
           _isRunning = false;
-          _playSound(); 
+          _playSound();
           _musicPlayer.stop();
 
           if (!_isBreak) {
@@ -107,7 +108,7 @@ class TimerScreenState extends State<TimerScreen> {
 
   void _resetTimer() {
     setState(() {
-      _seconds = _isBreak ? _breakDuration : 1500;
+      _seconds = _isBreak ? _breakDuration : 1;
       _isRunning = false;
       if (_timer != null) {
         _timer!.cancel();
@@ -119,7 +120,7 @@ class TimerScreenState extends State<TimerScreen> {
   void _toggleBreak() {
     setState(() {
       _isBreak = !_isBreak;
-      _seconds = _isBreak ? _breakDuration : 1500;
+      _seconds = _isBreak ? _breakDuration : 1;
 
       if (_isBreak) {
         _musicPlayer.stop();
@@ -135,7 +136,8 @@ class TimerScreenState extends State<TimerScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Text('Pomodoro Complete!'),
-        content: Text('Take a 20-minute break?\nDo you want to start another cycle?'),
+        content: Text(
+            'Take a 20-minute break?\nDo you want to start another cycle?'),
         actions: [
           TextButton(
             onPressed: () {
@@ -143,7 +145,7 @@ class TimerScreenState extends State<TimerScreen> {
               setState(() {
                 _pomodoroCount = 0; // Reset for new cycle
                 _isBreak = true;
-                _seconds = 1200; // 20 minutes
+                _seconds = 1; // 20 minutes
               });
               _startTimer();
             },
@@ -203,7 +205,8 @@ class TimerScreenState extends State<TimerScreen> {
                       _saveSelectedTask(newValue!);
                     });
                   },
-                  items: widget.tasks.map<DropdownMenuItem<String>>((String value) {
+                  items: widget.tasks
+                      .map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value, style: TextStyle(color: Colors.black)),
@@ -216,12 +219,18 @@ class TimerScreenState extends State<TimerScreen> {
           SizedBox(height: 20),
           Text(
             'Stay Stedii & Let’s Study!',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF6D2323)),
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF6D2323)),
           ),
           SizedBox(height: 20),
           Text(
             _formatTime(_seconds),
-            style: TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: Color(0xFFA31D1D)),
+            style: TextStyle(
+                fontSize: 60,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFA31D1D)),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -233,7 +242,9 @@ class TimerScreenState extends State<TimerScreen> {
                   '🍅',
                   style: TextStyle(
                     fontSize: 24,
-                    color: index < _pomodoroCount ? Color(0xFFA31D1D) : Colors.black26,
+                    color: index < _pomodoroCount
+                        ? Color(0xFFA31D1D)
+                        : Colors.black26,
                   ),
                 ),
               ),
@@ -250,8 +261,9 @@ class TimerScreenState extends State<TimerScreen> {
               SizedBox(width: 40),
               FloatingActionButton(
                 backgroundColor: Color(0xFFE5D0AC),
-                child: Icon(_isRunning ? Icons.pause : Icons.play_arrow, color: Color(0xFFA31D1D)),
                 onPressed: _isRunning ? _pauseTimer : _startTimer,
+                child: Icon(_isRunning ? Icons.pause : Icons.play_arrow,
+                    color: Color(0xFFA31D1D)),
               ),
               SizedBox(width: 40),
               IconButton(

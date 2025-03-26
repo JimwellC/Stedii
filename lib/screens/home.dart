@@ -17,7 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
     "Believe in yourself and all that you are. Know that there is something inside you greater than any obstacle.",
     "The only way to achieve the impossible is to believe it is possible.",
     "Stay consistent and disciplined, and success will follow.",
-    "Don’t watch the clock; do what it does. Keep going."
+    "Don’t watch the clock; do what it does. Keep going!"
   ];
 
   String get _randomQuote => _quotes[Random().nextInt(_quotes.length)];

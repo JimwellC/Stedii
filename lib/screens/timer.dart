@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class TimerScreen extends StatefulWidget {
   final List<String> tasks;
@@ -13,15 +14,32 @@ class TimerScreen extends StatefulWidget {
 
 class TimerScreenState extends State<TimerScreen> {
   int _seconds = 1500;
+  final int _breakDuration = 300;
   bool _isRunning = false;
   bool _isBreak = false;
   Timer? _timer;
   String? _selectedTask;
+  int _pomodoroCount = 0;
+  final int _maxPomodoros = 4;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioPlayer _musicPlayer = AudioPlayer();
+  bool _isMuted = false;
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
+    _audioPlayer.setVolume(_isMuted ? 0.0 : 1.0);
+    _musicPlayer.setReleaseMode(ReleaseMode.loop);
+    _musicPlayer.setVolume(_isMuted ? 0.0 : 1.0);
+  }
+  
+  void _toggleMute() {
+    setState(() {
+      _isMuted = !_isMuted;
+      _audioPlayer.setVolume(_isMuted ? 0.0 : 1.0);
+      _musicPlayer.setVolume(_isMuted ? 0.0 : 1.0);
+    });
   }
 
   Future<void> _loadTasks() async {
@@ -30,6 +48,12 @@ class TimerScreenState extends State<TimerScreen> {
       _selectedTask = widget.selectedTask ?? prefs.getString('last_selected_task');
     });
   }
+
+  Future<void> _playSound() async {
+    if (!_isMuted) {
+      await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
+    }
+  } 
 
   Future<void> _saveSelectedTask(String task) async {
     final prefs = await SharedPreferences.getInstance();
@@ -41,6 +65,11 @@ class TimerScreenState extends State<TimerScreen> {
       _timer!.cancel();
     }
     _isRunning = true;
+
+    if (!_isBreak && !_isMuted) {
+      _musicPlayer.play(AssetSource('sounds/lofi.mp3'));
+    }
+
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
         if (_seconds > 0) {
@@ -48,7 +77,19 @@ class TimerScreenState extends State<TimerScreen> {
         } else {
           _timer!.cancel();
           _isRunning = false;
-          _toggleBreak();
+          _playSound(); 
+          _musicPlayer.stop();
+
+          if (!_isBreak) {
+            _pomodoroCount++;
+          }
+
+          if (_pomodoroCount >= _maxPomodoros && !_isBreak) {
+            _showLongBreakDialog();
+          } else {
+            _toggleBreak();
+            _startTimer();
+          }
         }
       });
     });
@@ -58,6 +99,7 @@ class TimerScreenState extends State<TimerScreen> {
     if (_timer != null) {
       _timer!.cancel();
     }
+    _musicPlayer.stop();
     setState(() {
       _isRunning = false;
     });
@@ -65,19 +107,61 @@ class TimerScreenState extends State<TimerScreen> {
 
   void _resetTimer() {
     setState(() {
-      _seconds = _isBreak ? 300 : 1500;
+      _seconds = _isBreak ? _breakDuration : 1500;
       _isRunning = false;
       if (_timer != null) {
         _timer!.cancel();
       }
     });
+    _musicPlayer.stop();
   }
 
   void _toggleBreak() {
     setState(() {
       _isBreak = !_isBreak;
-      _seconds = _isBreak ? 300 : 1500;
+      _seconds = _isBreak ? _breakDuration : 1500;
+
+      if (_isBreak) {
+        _musicPlayer.stop();
+      } else if (!_isMuted) {
+        _musicPlayer.play(AssetSource('sounds/lofi.mp3'));
+      }
     });
+  }
+
+  void _showLongBreakDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Pomodoro Complete!'),
+        content: Text('Take a 20-minute break?\nDo you want to start another cycle?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              setState(() {
+                _pomodoroCount = 0; // Reset for new cycle
+                _isBreak = true;
+                _seconds = 1200; // 20 minutes
+              });
+              _startTimer();
+            },
+            child: Text('Yes'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              setState(() {
+                _pomodoroCount = 0;
+                _isRunning = false;
+              });
+            },
+            child: Text('No'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatTime(int seconds) {
@@ -139,6 +223,22 @@ class TimerScreenState extends State<TimerScreen> {
             _formatTime(_seconds),
             style: TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: Color(0xFFA31D1D)),
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              _maxPomodoros,
+              (index) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                child: Text(
+                  '🍅',
+                  style: TextStyle(
+                    fontSize: 24,
+                    color: index < _pomodoroCount ? Color(0xFFA31D1D) : Colors.black26,
+                  ),
+                ),
+              ),
+            ),
+          ),
           SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -155,8 +255,12 @@ class TimerScreenState extends State<TimerScreen> {
               ),
               SizedBox(width: 40),
               IconButton(
-                icon: Icon(Icons.volume_off, size: 30, color: Color(0xFFA31D1D)),
-                onPressed: () {},
+                icon: Icon(
+                  _isMuted ? Icons.volume_off : Icons.volume_up,
+                  size: 30,
+                  color: Color(0xFFA31D1D),
+                ),
+                onPressed: _toggleMute,
               ),
             ],
           ),

@@ -21,9 +21,7 @@ class StediiApp extends StatelessWidget {
         primaryColor: Color(0xFFA31D1D),
         scaffoldBackgroundColor: Color(0xFFFEF9E1),
       ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-      ),
+      darkTheme: ThemeData(brightness: Brightness.dark),
       themeMode: ThemeMode.system,
       home: MainScreen(),
     );
@@ -41,19 +39,19 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   List<String> _tasks = [];
   String? _selectedTask;
-  int _completedTasks = 0; // Track completed Pomodoro cycles
-  late List<Widget> _screens;
   bool _navigationLocked = false;
+
+  late List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
-    _loadCompletedTasks(); // Load completed tasks
+
     _screens = [
       HomeScreen(),
-      ChallengesScreen(completedTasks: _completedTasks), // Pass completed tasks
-      Placeholder(), // History Screen
+      const ChallengesScreen(), // ✅ no longer passes `completedTasks`
+      Placeholder(), // History placeholder
       TimerScreen(
         tasks: _tasks,
         selectedTask: null,
@@ -62,7 +60,7 @@ class _MainScreenState extends State<MainScreen> {
             _navigationLocked = isRunning;
           });
         },
-      )
+      ),
     ];
   }
 
@@ -70,17 +68,9 @@ class _MainScreenState extends State<MainScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _tasks = prefs.getStringList('tasks') ?? [];
-      _selectedTask = null; // Default to no selection when opening Timer
+      _selectedTask = null;
       _updateTimerScreen();
     });
-  }
-
-  Future<void> _loadCompletedTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _completedTasks = prefs.getInt('completed_tasks') ?? 0;
-    });
-    _updateChallengesScreen(); // Update ChallengesScreen with the loaded value
   }
 
   void _updateTimerScreen() {
@@ -95,15 +85,11 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _updateChallengesScreen() {
-    _screens[1] = ChallengesScreen(completedTasks: _completedTasks);
-  }
-
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
       if (index == 3) {
-        _loadTasks(); // Ensure tasks update when navigating to Timer
+        _loadTasks(); // Reload tasks when timer is selected
       }
     });
   }
@@ -137,7 +123,7 @@ class _MainScreenState extends State<MainScreen> {
             unselectedItemColor: Color(0xFF6D2323),
             backgroundColor: Color(0xFFE5D0AC),
             type: BottomNavigationBarType.fixed,
-            items: const <BottomNavigationBarItem>[
+            items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
               BottomNavigationBarItem(icon: Icon(Icons.flag), label: ''),
               BottomNavigationBarItem(icon: Icon(Icons.history), label: ''),

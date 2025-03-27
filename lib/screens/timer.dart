@@ -14,8 +14,8 @@ class TimerScreen extends StatefulWidget {
 }
 
 class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
-  int _seconds = 3;
-  final int _breakDuration = 10;
+  int _seconds = 25;
+  final int _breakDuration = 5;
   bool _isRunning = false;
   bool _isBreak = false;
   Timer? _timer;
@@ -163,19 +163,25 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
           });
  
           // Handle end of long break
-          if (_seconds == 10) {
+          if (_seconds == 5) {
             _lofiPlayer.pause(); // Pause the music
             _alarmPlayer.play(AssetSource('sounds/alarm.mp3')); // Play alarm
           }
  
-          _toggleBreak(); // Switch to study time
-          _startTimer();  // Start the next pomodoro
+          _toggleBreak(); 
+          _startTimer();  
         } else {
           _pomodoroCount++;
+          if (_pomodoroCount == 1) {
+            SharedPreferences.getInstance().then((prefs) {
+              prefs.setInt('completed_tasks', 1);
+            });
+          }
           _savePomodoroCount();
 
           if (_pomodoroCount >= _maxPomodoros) {
-            _completedCycles++; // ✅ increment immediately upon completing a full cycle
+            _completedCycles++; 
+            _savePomodoroCount(); 
             _showLongBreakDialog();
             return;
           }
@@ -197,7 +203,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     _lofiPlayer.stop();
     _alarmPlayer.stop();
     setState(() {
-      _seconds = _isBreak ? _breakDuration : 3;
+      _seconds = 0;
       _isRunning = false;
       widget.onTimerRunningChanged?.call(false);
       if (_timer != null) {
@@ -209,7 +215,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   void _toggleBreak() {
     setState(() {
       _isBreak = !_isBreak;
-      _seconds = _isBreak ? _breakDuration : 3;
+      _seconds = _isBreak ? _breakDuration : 25;
 
       if (_isBreak) {
        final random = (_breakChallenges.toList()..shuffle());
@@ -291,12 +297,12 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
               prefs.setInt('pomodoro_count', _pomodoroCount);
               Navigator.of(context).pop();
               setState(() {
-                _pomodoroCount = 0; // Reset for new cycle
+                _pomodoroCount = 0; 
                 _isBreak = true;
-                _seconds = 20; // 20-minute break
+                _seconds = 20; 
               });
               if (_pomodoroCount >= _maxPomodoros) {
-                _completedCycles++; // ✅ increment here
+                _completedCycles++;
                 _showLongBreakDialog();
                 return;
               }
@@ -306,18 +312,21 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
           ),
           TextButton( 
             onPressed: () async {
-              Navigator.of(context).pop(); // Close the long break dialog
+              Navigator.of(context).pop(); 
               _lofiPlayer.stop();
               _alarmPlayer.stop();
  
               final prefs = await SharedPreferences.getInstance();
               await prefs.setInt('pomodoro_count', 0);
- 
+              await prefs.setInt('completed_tasks', _completedCycles);
+              if (_pomodoroCount == 1) {
+                await prefs.setInt('completed_tasks', 1);
+              }
               setState(() {
                 _pomodoroCount = 0;
                 _isRunning = false;
                 _isBreak = false;
-                _seconds = 3;
+                _seconds = 25;
                 _currentChallenge = null;
                 if (_challengeDialogContext != null && mounted) {
                   try {
@@ -327,12 +336,11 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                 }
               });
             widget.onTimerRunningChanged?.call(false);
- 
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
                   title: Text('Session Complete!'),
-                  content: Text('You’ve completed $_completedCycles Pomodoros. Great job!'),
+                  content: Text('You’ve completed $_completedCycles Pomodoro Cycle. Great job!'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
@@ -360,6 +368,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   void _savePomodoroCount() async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setInt('pomodoro_count', _pomodoroCount);
+    prefs.setInt('completed_tasks', _completedCycles);
   }
 
   String _formatTime(int seconds) {

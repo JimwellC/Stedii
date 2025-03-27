@@ -1,40 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChallengesScreen extends StatefulWidget {
-  final int completedTasks; // Number of completed tasks (Pomodoro cycles)
-
-  const ChallengesScreen({super.key, required this.completedTasks});
+  const ChallengesScreen({super.key});
 
   @override
   ChallengesScreenState createState() => ChallengesScreenState();
 }
 
 class ChallengesScreenState extends State<ChallengesScreen> {
+  int _completedTasks = 0;
   final List<Map<String, dynamic>> _challenges = [
     {
       "title": "Triple Focus",
       "description": "Complete 3 study sessions today",
-      "completed": true
+      "completed": false
     },
     {
       "title": "Steady Streak",
       "description": "Study for 5 days in a row",
-      "completed": true
+      "completed": false
     },
     {
       "title": "No Procrastination",
       "description": "Start your study session within 5 minutes of planning",
-      "completed": true
+      "completed": false
     },
     {
       "title": "Pomodoro Pro",
       "description": "Complete 4 Pomodoro cycles",
-      "completed": true
+      "completed": false
     },
     {
       "title": "Mind & Body Sync",
       "description": "Do 3 study sessions and 3 relaxation exercises",
-      "completed": true
+      "completed": false
     },
     {
       "title": "Complete 1 Pomodoro Cycle",
@@ -42,8 +42,8 @@ class ChallengesScreenState extends State<ChallengesScreen> {
       "completed": false
     },
     {
-      "title": "Complete 3 Pomodoro Cycle",
-      "description": "Finish 3 Pomodoro cycles",
+      "title": "Complete 2 Pomodoro Cycle",
+      "description": "Finish 2 Pomodoro cycles",
       "completed": false
     },
   ];
@@ -51,25 +51,65 @@ class ChallengesScreenState extends State<ChallengesScreen> {
   @override
   void initState() {
     super.initState();
-    _updateChallenges(widget.completedTasks);
+    _loadCompletedCycles();
+    _loadCompletedChallenges();
   }
 
-  void _updateChallenges(int completedTasks) {
+  void _loadCompletedCycles() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completed = prefs.getInt('completed_tasks') ?? 0;
     setState(() {
-      final oneCycleIndex = _challenges.indexWhere(
-        (challenge) => challenge['title'] == "Complete 1 Pomodoro Cycle",
-      );
-      if (oneCycleIndex != -1 && completedTasks >= 1) {
-        _challenges[oneCycleIndex]['completed'] = true;
-      }
+      _completedTasks = completed;
+    });
+    _updateChallenges(completed);
+  }
 
-      final threeCycleIndex = _challenges.indexWhere(
-        (challenge) => challenge['title'] == "Complete 3 Pomodoro Cycle",
-      );
-      if (threeCycleIndex != -1 && completedTasks >= 3) {
-        _challenges[threeCycleIndex]['completed'] = true;
+  void _loadCompletedChallenges() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completedList = prefs.getStringList('completed_challenge_titles') ?? [];
+
+    setState(() {
+      for (var challenge in _challenges) {
+        if (completedList.contains(challenge['title'])) {
+          challenge['completed'] = true;
+        }
       }
     });
+  }
+
+  void _updateChallenges(int completedTasks) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> completedTitles = [];
+
+    setState(() {
+      for (var challenge in _challenges) {
+        switch (challenge['title']) {
+          case "Complete 1 Pomodoro Cycle":
+            challenge['completed'] = completedTasks >= 1;
+            break;
+          case "Complete 2 Pomodoro Cycle":
+            challenge['completed'] = completedTasks >= 2;
+            break;
+          case "Pomodoro Pro":
+            challenge['completed'] = completedTasks >= 4;
+            break;
+          case "Triple Focus":
+            challenge['completed'] = completedTasks >= 3;
+            break;
+          case "Steady Streak":
+            challenge['completed'] = completedTasks >= 5;
+            break;
+          default:
+            break;
+        }
+
+        if (challenge['completed'] == true) {
+          completedTitles.add(challenge['title']);
+        }
+      }
+    });
+
+    prefs.setStringList('completed_challenge_titles', completedTitles);
   }
 
   double get _progress {
@@ -81,14 +121,10 @@ class ChallengesScreenState extends State<ChallengesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Color(0xFFA31D1D),
-        title: Text("Challenges"),
-      ),
       body: Column(
         children: [
-          // Header Container
           Container(
+            height: 225,
             width: double.infinity,
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -101,10 +137,11 @@ class ChallengesScreenState extends State<ChallengesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                SizedBox(height: 75),
                 Text(
                   "Today's Challenges",
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 30,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -117,11 +154,11 @@ class ChallengesScreenState extends State<ChallengesScreen> {
                     color: Colors.white70,
                   ),
                 ),
+                SizedBox(height: 10),
               ],
             ),
           ),
-          SizedBox(height: 20),
-          // Progress Bar
+          SizedBox(height: 30),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -147,8 +184,6 @@ class ChallengesScreenState extends State<ChallengesScreen> {
               ],
             ),
           ),
-          SizedBox(height: 20),
-          // Challenges List
           Expanded(
             child: ListView.builder(
               itemCount: _challenges.length,
@@ -188,26 +223,28 @@ class ChallengesScreenState extends State<ChallengesScreen> {
                             : null,
                       ),
                       SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            challenge['title'],
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFA31D1D),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              challenge['title'],
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFA31D1D),
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 5),
-                          Text(
-                            challenge['description'],
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6D2323),
+                            SizedBox(height: 5),
+                            Text(
+                              challenge['description'],
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF6D2323),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stedii/screens/timer.dart';
+import 'package:stedii/screens/challenges.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,7 +12,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<String> _tasks = []; // Only declare once
+  List<String> _tasks = []; // List of tasks
+  int _completedTasks = 0; // Track completed Pomodoro cycles
   final TextEditingController _taskController = TextEditingController();
 
   final List<String> _quotes = [
@@ -28,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadTasks();
+    _loadCompletedTasks();
   }
 
   Future<void> _loadTasks() async {
@@ -40,6 +43,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _saveTasks() async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setStringList('tasks', _tasks);
+  }
+
+  Future<void> _loadCompletedTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _completedTasks = prefs.getInt('completed_tasks') ?? 0;
+    });
+  }
+
+  Future<void> _saveCompletedTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setInt('completed_tasks', _completedTasks);
   }
 
   void _addTask() {
@@ -60,12 +75,32 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveTasks();
   }
 
-  void _navigateToTimer(String task) {
-    Navigator.push(
+  void _navigateToTimer(String task) async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (context) => TimerScreen(tasks: _tasks, selectedTask: task)),
+        builder: (context) => TimerScreen(tasks: _tasks, selectedTask: task),
+      ),
     );
+
+    if (result == true) {
+      // Increment completed tasks and save
+      setState(() {
+        _completedTasks++;
+        _tasks.remove(task); // Remove the completed task
+      });
+      _saveTasks();
+      _saveCompletedTasks();
+
+      // Navigate to ChallengesScreen with updated completed tasks
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              ChallengesScreen(completedTasks: _completedTasks),
+        ),
+      );
+    }
   }
 
   @override
@@ -73,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: Column(
         children: [
+          // Header Section
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(vertical: 40, horizontal: 20),
@@ -141,6 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+          // Tasks Section
           Padding(
             padding: EdgeInsets.all(20),
             child: Align(
@@ -155,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          // Task List
           Expanded(
             child: ListView.builder(
               itemCount: _tasks.length,
@@ -208,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      // Add Task Button
       floatingActionButton: FloatingActionButton(
         backgroundColor: Color(0xFFA31D1D),
         child: Icon(Icons.add, color: Colors.white),

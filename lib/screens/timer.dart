@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 class TimerScreen extends StatefulWidget {
   final List<String> tasks;
   final String? selectedTask;
+
   const TimerScreen({super.key, required this.tasks, this.selectedTask});
 
   @override
@@ -25,6 +26,14 @@ class TimerScreenState extends State<TimerScreen> {
   final AudioPlayer _musicPlayer = AudioPlayer();
   bool _isMuted = false;
 
+  void _toggleMute() {
+    setState(() {
+      _isMuted = !_isMuted;
+      _audioPlayer.setVolume(_isMuted ? 0.0 : 1.0);
+      _musicPlayer.setVolume(_isMuted ? 0.0 : 1.0);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -34,26 +43,16 @@ class TimerScreenState extends State<TimerScreen> {
     _musicPlayer.setVolume(_isMuted ? 0.0 : 1.0);
   }
 
-  void _toggleMute() {
-    setState(() {
-      _isMuted = !_isMuted;
-      _audioPlayer.setVolume(_isMuted ? 0.0 : 1.0);
-      _musicPlayer.setVolume(_isMuted ? 0.0 : 1.0);
-    });
-  }
-
   Future<void> _loadTasks() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
+      // Ensure _selectedTask is valid
       _selectedTask =
           widget.selectedTask ?? prefs.getString('last_selected_task');
+      if (_selectedTask == null || !widget.tasks.contains(_selectedTask)) {
+        _selectedTask = widget.tasks.isNotEmpty ? widget.tasks.first : null;
+      }
     });
-  }
-
-  Future<void> _playSound() async {
-    if (!_isMuted) {
-      await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
-    }
   }
 
   Future<void> _saveSelectedTask(String task) async {
@@ -94,6 +93,12 @@ class TimerScreenState extends State<TimerScreen> {
         }
       });
     });
+  }
+
+  Future<void> _playSound() async {
+    if (!_isMuted) {
+      await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
+    }
   }
 
   void _pauseTimer() {
@@ -154,10 +159,7 @@ class TimerScreenState extends State<TimerScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              setState(() {
-                _pomodoroCount = 0;
-                _isRunning = false;
-              });
+              Navigator.pop(context, true); // Return true to HomeScreen
             },
             child: Text('No'),
           ),

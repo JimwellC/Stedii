@@ -2,19 +2,26 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:stedii/screens/progress-history.dart';
+import 'dart:convert';
 
 class TimerScreen extends StatefulWidget {
   final List<String> tasks;
   final String? selectedTask;
   final Function(bool)? onTimerRunningChanged;
-  const TimerScreen({Key? key, required this.tasks, this.selectedTask, this.onTimerRunningChanged}) : super(key: key);
+  const TimerScreen(
+      {Key? key,
+      required this.tasks,
+      this.selectedTask,
+      this.onTimerRunningChanged})
+      : super(key: key);
 
   @override
   TimerScreenState createState() => TimerScreenState();
 }
 
 class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
-  int _seconds = 25;
+  int _seconds = 5;
   final int _breakDuration = 5;
   bool _isRunning = false;
   bool _isBreak = false;
@@ -38,9 +45,14 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   BuildContext? _challengeDialogContext;
   bool _wasPausedDuringBreak = false; // Added field
 
+  // String? _currentTaskName; //history
+  List<String> _tasks = [];
+  int _totalElapsedTime = 0; // Track time in seconds
+
   @override
   void initState() {
     super.initState();
+    _loadElapsedTime();
     SharedPreferences.getInstance().then((prefs) {
       final isBreak = prefs.getBool('resume_isBreak') ?? false;
       final endTimeStr = prefs.getString('resume_endTime');
@@ -79,6 +91,24 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     _alarmPlayer.setVolume(_isMuted ? 0.0 : 1.0);
   }
 
+// for history
+  void _loadElapsedTime() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int savedTime = prefs.getInt('totalElapsedTime') ?? 0;
+
+    // ✅ Prevent loading incorrect old time
+    if (savedTime < 0) {
+      savedTime = 0;
+      await prefs.setInt('totalElapsedTime', 0);
+    }
+
+    print("Loaded elapsed time in HistoryProgressScreen: $savedTime");
+
+    setState(() {
+      _totalElapsedTime = savedTime;
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -95,9 +125,14 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadTasks() async {
-    final prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _selectedTask = widget.selectedTask ?? prefs.getString('last_selected_task');
+      _tasks = prefs.getStringList('tasks') ?? []; // Load all tasks
+
+      // If _selectedTask is not in the new list, reset it to null
+      if (_selectedTask != null && !_tasks.contains(_selectedTask)) {
+        _selectedTask = null;
+      }
     });
   }
 
@@ -124,6 +159,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
       );
       return;
     }
+
     SharedPreferences.getInstance().then((prefs) {
       prefs.setBool('resume_isBreak', _isBreak);
       if (_isBreak) {
@@ -131,57 +167,52 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
         prefs.setString('resume_endTime', endTime.toIso8601String());
       }
     });
+
+    if (!_isBreak) {
+      // ✅ Play Lofi Music during work time
+      _lofiPlayer.play(AssetSource('sounds/lofi.mp3'));
+    }
+
     if (_timer != null) {
       _timer!.cancel();
     }
+
     _isRunning = true;
     widget.onTimerRunningChanged?.call(true);
 
-    if (!_isBreak) {
-      _lofiPlayer.resume();
-    }
-
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       final remaining = _seconds - 1;
-      if (remaining == 10 && _isBreak) {
-        _lofiPlayer.pause();
-        _alarmPlayer.play(AssetSource('sounds/alarm.mp3'));
-      }
+
       if (remaining > 0) {
         setState(() {
           _seconds = remaining;
+          _totalElapsedTime++;
+          print("Elapsed Time: $_totalElapsedTime seconds");
         });
       } else {
         _timer!.cancel();
         _isRunning = false;
         widget.onTimerRunningChanged?.call(false);
 
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.remove('resume_isBreak');
+          prefs.remove('resume_endTime');
+          prefs.setInt('totalElapsedTime', _totalElapsedTime);
+          print("Saved Elapsed Time: $_totalElapsedTime seconds");
+        });
+
         if (_isBreak) {
-          SharedPreferences.getInstance().then((prefs) {
-            prefs.remove('resume_isBreak');
-            prefs.remove('resume_endTime');
-          });
- 
-          // Handle end of long break
-          if (_seconds == 5) {
-            _lofiPlayer.pause(); // Pause the music
-            _alarmPlayer.play(AssetSource('sounds/alarm.mp3')); // Play alarm
-          }
- 
-          _toggleBreak(); 
-          _startTimer();  
+          // ✅ Stop break alarm and resume lofi music
+          _alarmPlayer.stop();
+          _lofiPlayer.play(AssetSource('sounds/lofi.mp3'));
+          _toggleBreak();
+          _startTimer();
         } else {
           _pomodoroCount++;
-          if (_pomodoroCount == 1) {
-            SharedPreferences.getInstance().then((prefs) {
-              prefs.setInt('completed_tasks', 1);
-            });
-          }
           _savePomodoroCount();
 
           if (_pomodoroCount >= _maxPomodoros) {
-            _completedCycles++; 
-            _savePomodoroCount(); 
+            _completedCycles++;
             _showLongBreakDialog();
             return;
           }
@@ -192,8 +223,6 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
       }
     });
   }
-
-
 
   void _resetTimer() {
     SharedPreferences.getInstance().then((prefs) {
@@ -215,28 +244,34 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   void _toggleBreak() {
     setState(() {
       _isBreak = !_isBreak;
-      _seconds = _isBreak ? _breakDuration : 25;
+      _seconds = _isBreak ? _breakDuration : 5;
 
       if (_isBreak) {
-       final random = (_breakChallenges.toList()..shuffle());
+        // Pick a random challenge for break time
+        final random = (_breakChallenges.toList()..shuffle());
         _currentChallenge = random.firstWhere(
           (challenge) => challenge != _currentChallenge,
           orElse: () => random.first,
         );
 
+        // Show break challenge dialog
         WidgetsBinding.instance.addPostFrameCallback((_) {
           showGeneralDialog(
             context: context,
             barrierDismissible: true,
-            barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+            barrierLabel:
+                MaterialLocalizations.of(context).modalBarrierDismissLabel,
             barrierColor: Colors.black45,
             transitionDuration: Duration(milliseconds: 500),
-            pageBuilder: (BuildContext dialogContext, Animation<double> animation, Animation<double> secondaryAnimation) {
+            pageBuilder: (BuildContext dialogContext,
+                Animation<double> animation,
+                Animation<double> secondaryAnimation) {
               _challengeDialogContext = dialogContext;
               return Center(
                 child: AlertDialog(
                   backgroundColor: Color(0xFF712B2B),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15)),
                   content: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Text(
@@ -267,12 +302,20 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
           );
         });
 
+        // ✅ Stop lofi and play break alarm
         _lofiPlayer.pause();
+        _alarmPlayer
+            .stop(); // Ensure previous alarm stops before playing a new one
         _alarmPlayer.play(AssetSource('sounds/alarm.mp3'));
       } else {
         _currentChallenge = null;
+
+        // ✅ Stop alarm and resume lofi music
         _alarmPlayer.stop();
-        _lofiPlayer.resume();
+        _lofiPlayer.play(
+            AssetSource('sounds/lofi.mp3')); // Use play() instead of resume()
+
+        // Close challenge dialog if open
         if (_challengeDialogContext != null && mounted) {
           try {
             Navigator.of(_challengeDialogContext!).pop();
@@ -283,51 +326,93 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     });
   }
 
+  //updated history
+  void _onTaskComplete(String taskName, int completedCycles) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // ✅ Save the elapsed time
+    await prefs.setInt('totalElapsedTime', _totalElapsedTime);
+
+    List<String> completedTasks = prefs.getStringList('completedTasks') ?? [];
+    Map<String, dynamic> taskData = {
+      'name': taskName,
+      'timeSpent': _totalElapsedTime, // Store in seconds
+      'cyclesCompleted': completedCycles
+    };
+
+    completedTasks.add(json.encode(taskData));
+    await prefs.setStringList('completedTasks', completedTasks);
+
+    // ✅ Reset the elapsed time
+    setState(() {
+      _totalElapsedTime = 0;
+    });
+    await prefs.setInt('totalElapsedTime', 0);
+
+    // ✅ Remove the completed task from home
+    _removeTaskFromList(taskName);
+
+    print("Task '$taskName' completed and removed.");
+
+    // ✅ Navigate to History screen
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HistoryProgressScreen()),
+    );
+  }
+
   void _showLongBreakDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Text('Pomodoro Complete!'),
-        content: Text('Take a 20-minute break?\nDo you want to start another cycle?'),
+        content: Text(
+            'Take a 20-minute break?\nDo you want to start another cycle?'),
         actions: [
           TextButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
               prefs.setInt('pomodoro_count', _pomodoroCount);
               Navigator.of(context).pop();
+
               setState(() {
-                _pomodoroCount = 0; 
+                _pomodoroCount = 0;
                 _isBreak = true;
-                _seconds = 20; 
+                _seconds = 20;
               });
+
               if (_pomodoroCount >= _maxPomodoros) {
                 _completedCycles++;
-                _showLongBreakDialog();
+                _showCompletionDialog(); // ✅ Show completion dialog next
                 return;
               }
+
               _startTimer();
             },
             child: Text('Yes'),
           ),
-          TextButton( 
+          TextButton(
             onPressed: () async {
-              Navigator.of(context).pop(); 
+              Navigator.of(context).pop();
               _lofiPlayer.stop();
               _alarmPlayer.stop();
- 
+
               final prefs = await SharedPreferences.getInstance();
               await prefs.setInt('pomodoro_count', 0);
               await prefs.setInt('completed_tasks', _completedCycles);
+
               if (_pomodoroCount == 1) {
                 await prefs.setInt('completed_tasks', 1);
               }
+
               setState(() {
                 _pomodoroCount = 0;
                 _isRunning = false;
                 _isBreak = false;
-                _seconds = 25;
+                _seconds = 5;
                 _currentChallenge = null;
+
                 if (_challengeDialogContext != null && mounted) {
                   try {
                     Navigator.of(_challengeDialogContext!).pop();
@@ -335,26 +420,72 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                   _challengeDialogContext = null;
                 }
               });
-            widget.onTimerRunningChanged?.call(false);
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text('Session Complete!'),
-                  content: Text('You’ve completed $_completedCycles Pomodoro Cycle. Great job!'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text('OK'),
-                    ),
-                  ],
-                ),
-              );
+
+              widget.onTimerRunningChanged?.call(false);
+
+              _showCompletionDialog(); // ✅ Show completion dialog next
             },
             child: Text('No'),
           ),
         ],
       ),
     );
+  }
+
+// ✅ New function to handle the final completion dialog
+  void _showCompletionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Session Complete!'),
+        content: Text(
+            'You’ve completed $_completedCycles Pomodoro Cycles. Great job!'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // ✅ Close dialog first
+
+              if (_selectedTask != null) {
+                _onTaskComplete(_selectedTask!, _completedCycles);
+                _removeTaskFromList(_selectedTask!);
+              }
+            },
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+// ✅ Function to remove task from the list
+  void _removeTaskFromList(String taskName) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> tasks = prefs.getStringList('tasks') ?? [];
+
+    // ✅ Remove the task
+    tasks.removeWhere((task) => task == taskName);
+    await prefs.setStringList('tasks', tasks);
+
+    // ✅ Update the UI immediately
+    setState(() {});
+
+    print("Task '$taskName' removed and UI updated.");
+  }
+
+  void _startNewTask(String taskName) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // ✅ Reset elapsed time for the new task
+    setState(() {
+      _totalElapsedTime = 0;
+    });
+
+    // ✅ Store the reset value in SharedPreferences
+    await prefs.setInt('totalElapsedTime', 0);
+
+    print("New task '$taskName' started, resetting elapsed time to 0");
+
+    // Start the new task (your existing logic here)
   }
 
   void _toggleMute() {
@@ -411,7 +542,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
         appBar: AppBar(
           title: Text(
             'Timer',
-            style: TextStyle(fontSize: 24), 
+            style: TextStyle(fontSize: 24),
           ),
           titleTextStyle: TextStyle(color: Colors.white),
           backgroundColor: Color(0xFFA31D1D),
@@ -441,10 +572,12 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                         _saveSelectedTask(newValue!);
                       });
                     },
-                    items: widget.tasks.map<DropdownMenuItem<String>>((String value) {
+                    items: widget.tasks
+                        .map<DropdownMenuItem<String>>((String value) {
                       return DropdownMenuItem<String>(
                         value: value,
-                        child: Text(value, style: TextStyle(color: Colors.black)),
+                        child:
+                            Text(value, style: TextStyle(color: Colors.black)),
                       );
                     }).toList(),
                   ),
@@ -462,24 +595,24 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
             ),
             SizedBox(height: 20),
             Container(
-            width: 376,
-            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 50),
-            decoration: BoxDecoration(
-              color: Color(0xFFEADDC1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Center(
-              child: Text(
-                _formatTime(_seconds),
-                style: TextStyle(
-                  fontFamily: 'Digital',
-                  fontSize: 150,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF712B2B),
+              width: 376,
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 50),
+              decoration: BoxDecoration(
+                color: Color(0xFFEADDC1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Text(
+                  _formatTime(_seconds),
+                  style: TextStyle(
+                    fontFamily: 'Digital',
+                    fontSize: 150,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF712B2B),
+                  ),
                 ),
               ),
             ),
-          ),
             SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -491,7 +624,9 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                     '🍅',
                     style: TextStyle(
                       fontSize: 24,
-                      color: index < _pomodoroCount ? Color(0xFFA31D1D) : Colors.black26,
+                      color: index < _pomodoroCount
+                          ? Color(0xFFA31D1D)
+                          : Colors.black26,
                     ),
                   ),
                 ),

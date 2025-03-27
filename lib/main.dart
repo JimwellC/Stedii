@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stedii/screens/home.dart';
 import 'package:stedii/screens/timer.dart';
+import 'package:stedii/screens/challenges.dart';
 
 void main() {
   runApp(StediiApp());
 }
 
 class StediiApp extends StatelessWidget {
+  const StediiApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -28,6 +31,8 @@ class StediiApp extends StatelessWidget {
 }
 
 class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
   @override
   _MainScreenState createState() => _MainScreenState();
 }
@@ -36,6 +41,7 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   List<String> _tasks = [];
   String? _selectedTask;
+  int _completedTasks = 0; // Track completed Pomodoro cycles
   late List<Widget> _screens;
   bool _navigationLocked = false;
 
@@ -43,9 +49,10 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _loadTasks();
+    _loadCompletedTasks(); // Load completed tasks
     _screens = [
       HomeScreen(),
-      Placeholder(), // Challenges Screen
+      ChallengesScreen(completedTasks: _completedTasks), // Pass completed tasks
       Placeholder(), // History Screen
       TimerScreen(
         tasks: _tasks,
@@ -68,6 +75,14 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  Future<void> _loadCompletedTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _completedTasks = prefs.getInt('completed_tasks') ?? 0;
+    });
+    _updateChallengesScreen(); // Update ChallengesScreen with the loaded value
+  }
+
   void _updateTimerScreen() {
     _screens[3] = TimerScreen(
       tasks: _tasks,
@@ -78,6 +93,10 @@ class _MainScreenState extends State<MainScreen> {
         });
       },
     );
+  }
+
+  void _updateChallengesScreen() {
+    _screens[1] = ChallengesScreen(completedTasks: _completedTasks);
   }
 
   void _onItemTapped(int index) {

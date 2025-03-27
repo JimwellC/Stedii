@@ -37,6 +37,7 @@ class _MainScreenState extends State<MainScreen> {
   List<String> _tasks = [];
   String? _selectedTask;
   late List<Widget> _screens;
+  bool _navigationLocked = false;
 
   @override
   void initState() {
@@ -46,7 +47,15 @@ class _MainScreenState extends State<MainScreen> {
       HomeScreen(),
       Placeholder(), // Challenges Screen
       Placeholder(), // History Screen
-      TimerScreen(tasks: _tasks, selectedTask: null)
+      TimerScreen(
+        tasks: _tasks,
+        selectedTask: null,
+        onTimerRunningChanged: (isRunning) {
+          setState(() {
+            _navigationLocked = isRunning;
+          });
+        },
+      )
     ];
   }
 
@@ -60,7 +69,15 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _updateTimerScreen() {
-    _screens[3] = TimerScreen(tasks: _tasks, selectedTask: _selectedTask);
+    _screens[3] = TimerScreen(
+      tasks: _tasks,
+      selectedTask: _selectedTask,
+      onTimerRunningChanged: (isRunning) {
+        setState(() {
+          _navigationLocked = isRunning;
+        });
+      },
+    );
   }
 
   void _onItemTapped(int index) {
@@ -108,7 +125,7 @@ class _MainScreenState extends State<MainScreen> {
               BottomNavigationBarItem(icon: Icon(Icons.timer), label: ''),
             ],
             currentIndex: _selectedIndex,
-            onTap: _onItemTapped,
+            onTap: _navigationLocked ? null : _onItemTapped,
           ),
         ),
       ),

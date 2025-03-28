@@ -45,9 +45,9 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   BuildContext? _challengeDialogContext;
   bool _wasPausedDuringBreak = false; // Added field
 
-  // String? _currentTaskName; //history
+// FOR HISTORY - KUMI
   List<String> _tasks = [];
-  int _totalElapsedTime = 0; // Track time in seconds
+  int _totalElapsedTime = 0;
 
   @override
   void initState() {
@@ -91,7 +91,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     _alarmPlayer.setVolume(_isMuted ? 0.0 : 1.0);
   }
 
-// for history
+//  added by Kumi start
   void _loadElapsedTime() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     int savedTime = prefs.getInt('totalElapsedTime') ?? 0;
@@ -108,6 +108,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
       _totalElapsedTime = savedTime;
     });
   }
+//  added by Kumi end
 
   @override
   void dispose() {
@@ -124,6 +125,22 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  //  added by Katerisse; start
+  Future<void> _saveSessionHistory(int duration) async {
+    final prefs = await SharedPreferences.getInstance();
+    final String today = DateTime.now().toIso8601String().split("T")[0];
+
+    // Get existing records
+    List<String> history = prefs.getStringList('study_sessions') ?? [];
+
+    // Add new record
+    history.add(jsonEncode({'date': today, 'timeSpent': duration}));
+
+    await prefs.setStringList('study_sessions', history);
+  }
+//  added by Katerisse; end
+
+//  updated by Kumi start
   Future<void> _loadTasks() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -135,6 +152,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
       }
     });
   }
+  //  updated by Kumi end
 
   Future<void> _loadPomodoroCount() async {
     final prefs = await SharedPreferences.getInstance();
@@ -149,6 +167,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     prefs.setString('last_selected_task', task);
   }
 
+//  updated by Kumi start
   void _startTimer() {
     if (_selectedTask == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -202,7 +221,6 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
         });
 
         if (_isBreak) {
-          // ✅ Stop break alarm and resume lofi music
           _alarmPlayer.stop();
           _lofiPlayer.play(AssetSource('sounds/lofi.mp3'));
           _toggleBreak();
@@ -223,6 +241,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
       }
     });
   }
+//  updated by Kumi end
 
   void _resetTimer() {
     SharedPreferences.getInstance().then((prefs) {
@@ -241,6 +260,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     });
   }
 
+//  updated by Kumi start
   void _toggleBreak() {
     setState(() {
       _isBreak = !_isBreak;
@@ -326,7 +346,9 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     });
   }
 
-  //updated history
+//  updated by Kumi end
+
+//  updated/added by Kumi start
   void _onTaskComplete(String taskName, int completedCycles) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
@@ -336,7 +358,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     List<String> completedTasks = prefs.getStringList('completedTasks') ?? [];
     Map<String, dynamic> taskData = {
       'name': taskName,
-      'timeSpent': _totalElapsedTime, // Store in seconds
+      'timeSpent': _totalElapsedTime,
       'cyclesCompleted': completedCycles
     };
 
@@ -484,9 +506,8 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     await prefs.setInt('totalElapsedTime', 0);
 
     print("New task '$taskName' started, resetting elapsed time to 0");
-
-    // Start the new task (your existing logic here)
   }
+//  updated/added by Kumi end
 
   void _toggleMute() {
     setState(() {
@@ -496,11 +517,63 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     _alarmPlayer.setVolume(_isMuted ? 0.0 : 1.0);
   }
 
+  // added by Katerisse pt. 4; start
+
+  void _updateUI() {
+    setState(() {}); // Triggers a UI update
+  }
+// added by Katerisse pt. 4; end
+
+// added by Katerisse pt. 5; start
+  void _saveTrackedTime(int newSeconds) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int currentTotal = prefs.getInt('total_seconds') ?? 0;
+    prefs.setInt('total_seconds', currentTotal + newSeconds);
+  }
+
+// added by Katerisse pt. 5; end
+
   void _savePomodoroCount() async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setInt('pomodoro_count', _pomodoroCount);
     prefs.setInt('completed_tasks', _completedCycles);
+    // added by Katerisse pt. 3; start
+    DateTime now = DateTime.now();
+    String today = "${now.year}-${now.month}-${now.day}";
+
+    List<String> recordedDays = prefs.getStringList('recorded_days') ?? [];
+
+    // Add today if not already recorded
+    if (!recordedDays.contains(today)) {
+      recordedDays.add(today);
+    }
+    prefs.setStringList('recorded_days', recordedDays);
+
+    // Save total recorded hours
+    int totalSeconds = prefs.getInt('total_seconds') ?? 0;
+    totalSeconds += (25 * 60); // Assuming 25-minute Pomodoro
+    prefs.setInt('total_seconds', totalSeconds);
+
+    _updateUI(); // Call function to update the calendar display
   }
+// added by Katerisse pt. 3; end
+
+// added by Katerisse pt. 6; start
+  String getFormattedTime(int seconds) {
+    final int minutes = seconds ~/ 60;
+    final int remainingSeconds = seconds % 60;
+    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+// added by Katerisse pt. 6; end
+
+// added by Katerisse pt. 6; start
+
+  String formatRecordedTime(int seconds) {
+    int hours = seconds ~/ 3600;
+    int minutes = (seconds % 3600) ~/ 60;
+    return "${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}";
+  }
+// added by Katerisse pt. 6; end
 
   String _formatTime(int seconds) {
     int minutes = seconds ~/ 60;

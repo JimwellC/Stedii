@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:table_calendar/table_calendar.dart';
 
 class HistoryProgressScreen extends StatefulWidget {
   @override
@@ -11,13 +12,148 @@ class _HistoryProgressScreenState extends State<HistoryProgressScreen> {
   List<Map<String, dynamic>> completedTasks = [];
   int _totalElapsedTime = 0;
 
+  Map<DateTime, int> trackedHours = {};
+  late SharedPreferences prefs;
+  List<Map<String, dynamic>> _history = []; // Add this to store history
+
   @override
   void initState() {
     super.initState();
     _loadElapsedTime();
-    _loadHistory(); // ✅ Load completed tasks
+    _loadHistory();
+    _loadTrackedData();
   }
 
+  // Function to format recorded time
+  String formatRecordedTime(int seconds) {
+    int hours = seconds ~/ 3600;
+    int minutes = (seconds % 3600) ~/ 60;
+    return "$hours h $minutes min";
+  }
+
+  Future<void> _loadTrackedData() async {
+    prefs = await SharedPreferences.getInstance();
+    String? savedData = prefs.getString('trackedHours');
+    if (savedData != null) {
+      setState(() {
+        trackedHours = (json.decode(savedData) as Map<String, dynamic>).map(
+          (key, value) => MapEntry(DateTime.parse(key), value as int),
+        );
+      });
+    } else {
+      trackedHours = {}; // Ensure it’s not null
+    }
+  }
+
+//Kate
+  bool _isTrackedDay(DateTime day) {
+    return trackedHours.keys
+        .any((trackedDay) => _normalizeDate(trackedDay) == _normalizeDate(day));
+  }
+
+  String _normalizeDate(DateTime date) {
+    return date.toUtc().toIso8601String().split('T')[0]; // Keep only date part
+  }
+
+  Widget _buildCalendar() {
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return CircularProgressIndicator();
+
+        List<String> recordedDays =
+            snapshot.data!.getStringList('recorded_days') ?? [];
+        DateTime now = DateTime.now();
+        String today = "${now.year}-${now.month}-${now.day}";
+
+        return TableCalendar(
+          focusedDay: DateTime.now(),
+          firstDay: DateTime.utc(2020, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          calendarFormat: CalendarFormat.month,
+          headerStyle: HeaderStyle(
+            formatButtonVisible: false,
+            titleCentered: true,
+            titleTextStyle: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF6D2323),
+            ),
+          ),
+          daysOfWeekStyle: DaysOfWeekStyle(
+            weekdayStyle: TextStyle(color: Color(0xFF6D2323)),
+            weekendStyle: TextStyle(color: Color(0xFF6D2323)),
+          ),
+          calendarStyle: CalendarStyle(
+            todayDecoration: BoxDecoration(
+              color: recordedDays.contains(today)
+                  ? Color(0xFFA31D1D)
+                  : Colors.transparent,
+            ),
+            defaultTextStyle: TextStyle(color: Color(0xFF6D2323)),
+            weekendTextStyle: TextStyle(color: Color(0xFF6D2323)),
+            markerDecoration: BoxDecoration(
+              color: Color(0xFFA31D1D),
+              shape: BoxShape.rectangle,
+            ),
+          ),
+          selectedDayPredicate: _isTrackedDay, // Improved selection logic
+          eventLoader: (day) {
+            return trackedHours.containsKey(_normalizeDate(day))
+                ? [trackedHours[day] ?? 0]
+                : [];
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRecordedStats() {
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return CircularProgressIndicator();
+
+        List<String> recordedDays =
+            snapshot.data!.getStringList('recorded_days') ?? [];
+        int totalSeconds = snapshot.data!.getInt('total_seconds') ?? 0;
+
+        return Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start, // Align items to the left
+          children: [
+            RichText(
+              text: TextSpan(
+                style: TextStyle(fontSize: 18, color: Color(0xFF6D2323)),
+                children: [
+                  TextSpan(
+                      text: "Recorded Days: ",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(
+                      text: "${recordedDays.length}"), // Number remains normal
+                ],
+              ),
+            ),
+            SizedBox(height: 5), // Small space between the two texts
+            RichText(
+              text: TextSpan(
+                style: TextStyle(fontSize: 18, color: Color(0xFF6D2323)),
+                children: [
+                  TextSpan(
+                      text: "Recorded Hours: ",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(text: formatRecordedTime(totalSeconds)),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  // end kate
+
+// kumi
   void _loadElapsedTime() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     int savedTime = prefs.getInt('totalElapsedTime') ?? 0;
@@ -56,7 +192,7 @@ class _HistoryProgressScreenState extends State<HistoryProgressScreen> {
           ? "$minutes min $remainingSeconds sec"
           : "$minutes min";
     }
-    return "$remainingSeconds sec"; // Show seconds if <1 min
+    return "$remainingSeconds sec";
   }
 
   @override
@@ -71,29 +207,65 @@ class _HistoryProgressScreenState extends State<HistoryProgressScreen> {
         backgroundColor: Color(0xFFA31D1D),
         iconTheme: IconThemeData(color: Color(0xFF6D2323)),
         elevation: 0,
-        centerTitle: true, // This centers the title in the AppBar
+        centerTitle: true,
       ),
-      body: completedTasks.isEmpty
-          ? Center(
-              child: Text("No completed tasks yet",
-                  style: TextStyle(fontSize: 18, color: Color(0xFF6D2323))))
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  SizedBox(height: 16),
-                  Text(
-                    "History",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF6D2323),
-                    ),
-                    textAlign: TextAlign.center,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              SizedBox(height: 30),
+              Center(
+                child: Text(
+                  "Progress",
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF6D2323),
                   ),
-                  SizedBox(height: 16),
-                  Expanded(
-                    child: ListView.builder(
+                ),
+              ),
+              SizedBox(height: 10),
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Color(0xFFE5D0AC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: _buildCalendar(),
+              ),
+              SizedBox(height: 10),
+              Container(
+                padding: EdgeInsets.all(10),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Color(0xFFE5D0AC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: _buildRecordedStats(),
+              ),
+              SizedBox(height: 16),
+              Text(
+                "History",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF6D2323),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+              completedTasks.isEmpty
+                  ? Center(
+                      child: Text(
+                        "No completed tasks yet",
+                        style:
+                            TextStyle(fontSize: 18, color: Color(0xFF6D2323)),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
                       itemCount: completedTasks.length,
                       itemBuilder: (context, index) {
                         String taskName = completedTasks[index]['name'];
@@ -167,10 +339,10 @@ class _HistoryProgressScreenState extends State<HistoryProgressScreen> {
                         );
                       },
                     ),
-                  ),
-                ],
-              ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

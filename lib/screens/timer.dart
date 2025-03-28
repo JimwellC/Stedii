@@ -171,16 +171,6 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
 
 //  updated by Kumi start
   void _startTimer() {
-    if (_selectedTask == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Please select a task before starting the timer."),
-          backgroundColor: Color(0xFFA31D1D),
-        ),
-      );
-      return;
-    }
-
     SharedPreferences.getInstance().then((prefs) {
       prefs.setBool('resume_isBreak', _isBreak);
       if (_isBreak) {
@@ -474,11 +464,9 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
             onPressed: () {
               Navigator.of(context).pop(); // ✅ Close dialog first
 
-              if (_selectedTask != null) {
-                _onTaskComplete(_selectedTask!, _completedCycles);
-                _removeTaskFromList(_selectedTask!);
-              }
-            },
+              _onTaskComplete(_selectedTask!, _completedCycles);
+              _removeTaskFromList(_selectedTask!);
+                        },
             child: Text('OK'),
           ),
         ],
@@ -642,10 +630,10 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: _tasks.contains(_selectedTask) ? _selectedTask : null,
-                    icon: Icon(Icons.arrow_drop_down, color: Colors.black),
+                    icon: Icon(Icons.arrow_drop_down, color: Color(0xFFA31D1D)),
                     isExpanded: true,
                     style: TextStyle(fontSize: 18, color: Colors.white),
-                    dropdownColor: Color(0xFFE5D0AC),
+                    dropdownColor: Color.fromARGB(255, 249, 248, 245),
                     onChanged: (String? newValue) {
                       if (newValue != null) {
                         setState(() {
@@ -659,7 +647,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                       return DropdownMenuItem<String>(
                         value: value,
                         child:
-                            Text(value, style: TextStyle(color: Colors.black)),
+                            Text(value, style: TextStyle(color: Color(0xFFA31D1D))),
                       );
                     }).toList(),
                   ),

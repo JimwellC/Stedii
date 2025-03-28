@@ -21,12 +21,12 @@ class TimerScreen extends StatefulWidget {
 }
 
 class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
-  int _seconds = 25;
+  int _seconds = 5;
   final int _breakDuration = 5;
   bool _isRunning = false;
   bool _isBreak = false;
   Timer? _timer;
-  String? _selectedTask;
+  late String _selectedTask;
   int _pomodoroCount = 0;
   int _completedCycles = 0;
   final int _maxPomodoros = 4;
@@ -76,6 +76,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     });
     WidgetsBinding.instance.addObserver(this);
     _loadTasks();
+    _selectedTask = widget.selectedTask ?? '';
     if (_wasPausedDuringBreak) {
       setState(() {
         _isBreak = true;
@@ -147,9 +148,9 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     setState(() {
       _tasks = prefs.getStringList('tasks') ?? []; // Load all tasks
 
-      // If _selectedTask is not in the new list, reset it to null
-      if (_selectedTask != null && !_tasks.contains(_selectedTask)) {
-        _selectedTask = null;
+      // If _selectedTask is not in the new list, set it to the first task or an empty string
+      if (!_tasks.contains(_selectedTask)) {
+        _selectedTask = _tasks.isNotEmpty ? _tasks.first : '';
       }
     });
   }
@@ -203,6 +204,12 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       final remaining = _seconds - 1;
 
+      // 🔁 10 seconds before break ends
+      if (_isBreak && remaining == 10) {
+        _lofiPlayer.pause();
+        _alarmPlayer.resume();
+      }
+
       if (remaining >= 0) {
         setState(() {
           _seconds = remaining;
@@ -223,6 +230,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
 
         if (_isBreak) {
           _alarmPlayer.pause();
+          _alarmPlayer.stop();
           _lofiPlayer.resume();
           _toggleBreak();
           _startTimer();
@@ -265,7 +273,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   void _toggleBreak() {
     setState(() {
       _isBreak = !_isBreak;
-      _seconds = _isBreak ? _breakDuration : 25;
+      _seconds = _isBreak ? _breakDuration : 5;
 
       if (_isBreak) {
         // Pick a random challenge for break time
@@ -357,7 +365,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     List<String> completedTasks = prefs.getStringList('completedTasks') ?? [];
     Map<String, dynamic> taskData = {
       'name': taskName,
-      'timeSpent': _totalElapsedTime + 2,
+      'timeSpent': _totalElapsedTime,
       'cyclesCompleted': completedCycles
     };
 
@@ -376,7 +384,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     print("Task '$taskName' completed and removed.");
 
     // ✅ Navigate to History screen
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => HistoryProgressScreen()),
     );
@@ -633,16 +641,18 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: _selectedTask,
-                    icon: Icon(Icons.arrow_drop_down, color: Colors.white),
+                    value: _tasks.contains(_selectedTask) ? _selectedTask : null,
+                    icon: Icon(Icons.arrow_drop_down, color: Colors.black),
                     isExpanded: true,
                     style: TextStyle(fontSize: 18, color: Colors.white),
-                    dropdownColor: Color(0xFFA31D1D),
+                    dropdownColor: Color(0xFFE5D0AC),
                     onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedTask = newValue;
-                        _saveSelectedTask(newValue!);
-                      });
+                      if (newValue != null) {
+                        setState(() {
+                          _selectedTask = newValue;
+                          _saveSelectedTask(newValue);
+                        });
+                      }
                     },
                     items: widget.tasks
                         .map<DropdownMenuItem<String>>((String value) {

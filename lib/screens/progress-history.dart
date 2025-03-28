@@ -118,9 +118,22 @@ class _HistoryProgressScreenState extends State<HistoryProgressScreen> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return CircularProgressIndicator();
 
+        List<String>? storedTasks = snapshot.data!.getStringList('completedTasks');
+        int totalSeconds = 0;
+
+        if (storedTasks != null) {
+          for (var task in storedTasks) {
+            try {
+              final parsed = json.decode(task);
+              totalSeconds += (parsed['timeSpent'] as num?)?.toInt() ?? 0;
+            } catch (e) {
+              print("Error decoding task in stats: $e");
+            }
+          }
+        }
+
         List<String> recordedDays =
             snapshot.data!.getStringList('recorded_days') ?? [];
-        int totalSeconds = snapshot.data!.getInt('total_seconds') ?? 0;
 
         return Column(
           crossAxisAlignment:
@@ -177,7 +190,12 @@ class _HistoryProgressScreenState extends State<HistoryProgressScreen> {
       setState(() {
         completedTasks = storedTasks.map((task) {
           try {
-            return json.decode(task) as Map<String, dynamic>;
+            return json.decode(task, reviver: (key, value) {
+              if (key == 'date' && value is String) {
+                return DateTime.tryParse(value);
+              }
+              return value;
+            }) as Map<String, dynamic>;
           } catch (e) {
             print("Error decoding task: $e");
             return {'name': 'Unknown Task', 'timeSpent': 0}; // Fallback
@@ -225,6 +243,17 @@ class _HistoryProgressScreenState extends State<HistoryProgressScreen> {
         iconTheme: IconThemeData(color: Color(0xFF6D2323)),
         elevation: 0,
         centerTitle: true,
+        automaticallyImplyLeading: true, // Ensures the back button is shown
+        leading: Builder(
+          builder: (context) {
+            return ModalRoute.of(context)?.canPop == true
+                ? IconButton(
+                    icon: Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  )
+                : Container();
+          },
+        ),
       ),
       body: SingleChildScrollView(
         child: Padding(

@@ -62,6 +62,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _tasks.removeAt(index);
     });
     _saveTasks();
+    SharedPreferences.getInstance().then((prefs) {
+      final lastSelected = prefs.getString('last_selected_task');
+      if (lastSelected == _tasks[index]) {
+        prefs.remove('last_selected_task');
+      }
+    });
   }
 
   void _navigateToTimer(String task) async {

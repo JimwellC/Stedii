@@ -21,7 +21,7 @@ class TimerScreen extends StatefulWidget {
 }
 
 class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
-  int _seconds = 5;
+  int _seconds = 25;
   final int _breakDuration = 5;
   bool _isRunning = false;
   bool _isBreak = false;
@@ -60,7 +60,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
         final endTime = DateTime.tryParse(endTimeStr);
         if (endTime != null) {
           final remaining = endTime.difference(DateTime.now()).inSeconds;
-          if (remaining > 0) {
+          if (remaining >= 0) {
             setState(() {
               _isBreak = true;
               _seconds = remaining;
@@ -87,6 +87,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     _loadPomodoroCount(); // Load the saved pomodoro count
     _lofiPlayer.setReleaseMode(ReleaseMode.loop);
     _lofiPlayer.setSource(AssetSource('sounds/lofi.mp3')); // preload lofi audio
+    _alarmPlayer.setSource(AssetSource('sounds/alarm.mp3')); // preload alarm
     _lofiPlayer.setVolume(_isMuted ? 0.0 : 1.0);
     _alarmPlayer.setVolume(_isMuted ? 0.0 : 1.0);
   }
@@ -188,8 +189,8 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     });
 
     if (!_isBreak) {
-      // ✅ Play Lofi Music during work time
-      _lofiPlayer.play(AssetSource('sounds/lofi.mp3'));
+      // ✅ Resume Lofi Music during work time
+      _lofiPlayer.resume(); // Avoid reloading the source to prevent Future already completed
     }
 
     if (_timer != null) {
@@ -202,7 +203,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       final remaining = _seconds - 1;
 
-      if (remaining > 0) {
+      if (remaining >= 0) {
         setState(() {
           _seconds = remaining;
           _totalElapsedTime++;
@@ -221,8 +222,8 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
         });
 
         if (_isBreak) {
-          _alarmPlayer.stop();
-          _lofiPlayer.play(AssetSource('sounds/lofi.mp3'));
+          _alarmPlayer.pause();
+          _lofiPlayer.resume();
           _toggleBreak();
           _startTimer();
         } else {
@@ -264,7 +265,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   void _toggleBreak() {
     setState(() {
       _isBreak = !_isBreak;
-      _seconds = _isBreak ? _breakDuration : 5;
+      _seconds = _isBreak ? _breakDuration : 25;
 
       if (_isBreak) {
         // Pick a random challenge for break time
@@ -322,18 +323,16 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
           );
         });
 
-        // ✅ Stop lofi and play break alarm
+        // ✅ Stop lofi and pause/resume alarm to avoid reloading issues
         _lofiPlayer.pause();
-        _alarmPlayer
-            .stop(); // Ensure previous alarm stops before playing a new one
-        _alarmPlayer.play(AssetSource('sounds/alarm.mp3'));
+        _alarmPlayer.pause();
+        _alarmPlayer.resume(); // Resume alarm if paused previously
       } else {
         _currentChallenge = null;
 
         // ✅ Stop alarm and resume lofi music
         _alarmPlayer.stop();
-        _lofiPlayer.play(
-            AssetSource('sounds/lofi.mp3')); // Use play() instead of resume()
+        _lofiPlayer.resume(); // resume music after break
 
         // Close challenge dialog if open
         if (_challengeDialogContext != null && mounted) {
@@ -432,7 +431,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                 _pomodoroCount = 0;
                 _isRunning = false;
                 _isBreak = false;
-                _seconds = 5;
+                _seconds = 25;
                 _currentChallenge = null;
 
                 if (_challengeDialogContext != null && mounted) {

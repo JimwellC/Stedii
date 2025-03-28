@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+// ignore: depend_on_referenced_packages
 import 'package:table_calendar/table_calendar.dart';
 
 class HistoryProgressScreen extends StatefulWidget {
+  const HistoryProgressScreen({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _HistoryProgressScreenState createState() => _HistoryProgressScreenState();
 }
 
@@ -193,6 +197,19 @@ class _HistoryProgressScreenState extends State<HistoryProgressScreen> {
           : "$minutes min";
     }
     return "$remainingSeconds sec";
+  }
+
+  void _startNewTask(String taskName) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // ✅ Reset elapsed time for the new task
+    setState(() {
+      _totalElapsedTime = 0;
+    });
+
+    // ✅ Store the reset value in SharedPreferences
+    await prefs.setInt('totalElapsedTime', 0);
+    print("New task '$taskName' started, resetting elapsed time to 0");
   }
 
   @override

@@ -21,7 +21,7 @@ class TimerScreen extends StatefulWidget {
 }
 
 class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
-  int _seconds = 5;
+  int _seconds = 25;
   final int _breakDuration = 5;
   bool _isRunning = false;
   bool _isBreak = false;
@@ -273,7 +273,7 @@ class TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   void _toggleBreak() {
     setState(() {
       _isBreak = !_isBreak;
-      _seconds = _isBreak ? _breakDuration : 5;
+      _seconds = _isBreak ? _breakDuration : 25;
 
       if (_isBreak) {
         // Pick a random challenge for break time

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stedii/screens/home.dart';
+import 'package:stedii/screens/progress-history.dart';
 import 'package:stedii/screens/timer.dart';
 import 'package:stedii/screens/challenges.dart';
 
@@ -51,7 +52,7 @@ class _MainScreenState extends State<MainScreen> {
     _screens = [
       HomeScreen(),
       const ChallengesScreen(), // ✅ no longer passes `completedTasks`
-      Placeholder(), // History placeholder
+      HistoryProgressScreen(), // History placeholder
       TimerScreen(
         tasks: _tasks,
         selectedTask: null,

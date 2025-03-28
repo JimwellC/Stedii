@@ -9,7 +9,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<String> _tasks = [];
+  List<String> _tasks = []; // Only declare once
   final TextEditingController _taskController = TextEditingController();
 
   final List<String> _quotes = [
@@ -26,12 +26,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadTasks();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadTasks(); // ✅ Reloads tasks when coming back to HomeScreen
   }
 
   Future<void> _loadTasks() async {
@@ -64,13 +58,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveTasks();
   }
 
-  void _navigateToTimer(String task) async {
-    await Navigator.push(
+  void _navigateToTimer(String task) {
+    Navigator.push(
       context,
-      MaterialPageRoute(
-          builder: (context) => TimerScreen(tasks: _tasks, selectedTask: task)),
+      MaterialPageRoute(builder: (context) => TimerScreen(tasks: _tasks, selectedTask: task)),
     );
-    _loadTasks(); // ✅ Reload tasks when coming back
   }
 
   @override
@@ -220,10 +212,8 @@ class _HomeScreenState extends State<HomeScreen> {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              title:
-                  Text('Add Task', style: TextStyle(color: Color(0xFFA31D1D))),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: Text('Add Task', style: TextStyle(color: Color(0xFFA31D1D))),
               content: TextField(
                 controller: _taskController,
                 decoration: InputDecoration(hintText: 'Enter a task'),
@@ -234,8 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: () => Navigator.pop(context),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFFA31D1D)),
+                  style: ElevatedButton.styleFrom(backgroundColor: Color(0xFFA31D1D)),
                   child: Text('Add', style: TextStyle(color: Colors.white)),
                   onPressed: _addTask,
                 ),
